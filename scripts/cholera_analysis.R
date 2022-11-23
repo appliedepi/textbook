@@ -11,6 +11,7 @@ pacman::p_load(
      janitor,
      lubridate,
      randomNames,
+     flextable,
      tidyverse
 )
 
@@ -36,7 +37,7 @@ chol <- chol_raw %>%
      mutate(name = randomNames::randomNames(n = nrow(.),
                                             gender = sex)) %>% 
      # add age groups
-     mutate(age_group = age_categories(age_years,
+     mutate(age_grp = age_categories(age_years,
                                        breakers = c(0,5,10,15,20,30,40,50,60))) %>% 
      
      # recode unknown gender to NA
@@ -60,6 +61,9 @@ chol <- chol_raw %>%
           date_onset < ymd("20180515") ~ sample(c("A", "B", "C"), nrow(.), replace = TRUE, prob = c(.6, .3, .14)),
           
           TRUE ~ "A")) %>% 
+     
+     # re-code case_id
+     mutate(case_id = )
           
      # recode pregnant away from MSF acronyms      
      mutate(
@@ -83,14 +87,8 @@ chol <- chol_raw %>%
                town == "B" ~ sample(c("Severe", "Moderate", NA), nrow(.), replace = TRUE, prob = c(.3, .6, .05)),
                town == "C" ~ sample(c("Severe", "Moderate", NA), nrow(.), replace = TRUE, prob = c(.8, .1, .05)),
           ),
-          # Most people who make it into the linelist have loose stools
-          loose_stool = case_when(
-               town == "A" ~ sample(c("Yes", "No", NA), nrow(.), replace = TRUE, prob = c(.7, .2, .05)),
-               town == "B" ~ sample(c("Yes", "No", NA), nrow(.), replace = TRUE, prob = c(.7, .2, .05)),
-               town == "C" ~ sample(c("Yes", "No", NA), nrow(.), replace = TRUE, prob = c(.9, .1, .05)),
-          ),
           # Very few people have bloody stools generally
-          bloody_stool = case_when(
+          stool_bloody = case_when(
                town == "A" ~ sample(c("Yes", "No", NA), nrow(.), replace = TRUE, prob = c(.1, .8, .05)),
                town == "B" ~ sample(c("Yes", "No", NA), nrow(.), replace = TRUE, prob = c(.2, .7, .05)),
                town == "C" ~ sample(c("Yes", "No", NA), nrow(.), replace = TRUE, prob = c(.1, .8, .05)),
@@ -101,18 +99,18 @@ chol <- chol_raw %>%
      mutate(
           # risk factors
           death_chance = 0,
-          death_chance = ifelse(age_group %in% c("0-4", "5-10", "60+"), death_chance + 0.15, death_chance), # vulnerable ages
+          death_chance = ifelse(age_grp %in% c("0-4", "5-10", "60+"), death_chance + 0.15, death_chance), # vulnerable ages
           death_chance = ifelse(dehy_at_admit %in% c("Severe"), death_chance + 0.40, death_chance), # dehydration
           death_chance = ifelse(dehy_at_admit %in% c("Moderate"), death_chance + 0.20, death_chance), # dehydration
           death_chance = ifelse(!is.na(date_onset) & date_onset < ymd("20180301"), death_chance + 0.40, death_chance),  # first wave
-          death_chance = ifelse(!is.na(loose_stool) & loose_stool == "Yes", death_chance + 0.20, death_chance), # diarrhea
+          #death_chance = ifelse(!is.na(loose_stool) & loose_stool == "Yes", death_chance + 0.20, death_chance), # diarrhea
           death_chance = ifelse(!is.na(town) & town == "C", death_chance + 0.20, death_chance), # remote, poor infrastructure, epicentre
           death_chance = ifelse(!is.na(pregnant) & pregnant == "Yes", death_chance + 0.15, death_chance), # complications
           death_chance = ifelse(!is.na(oedema) & oedema == "Yes", death_chance + 0.20, death_chance),
 
           # protective factors
           death_chance = ifelse(!is.na(prior_vax) & prior_vax == "Yes", death_chance - 0.80, death_chance),    # prior vaccination
-          death_chance = ifelse(!is.na(bloody_stool) & bloody_stool == "Yes", death_chance - 0.20, death_chance), # likely not cholera
+          death_chance = ifelse(!is.na(stool_bloody) & stool_bloody == "Yes", death_chance - 0.20, death_chance), # likely not cholera
           death_chance = ifelse(!is.na(date_onset) & date_onset > ymd("20180415"), death_chance - 0.40, death_chance),  # ending protection
           
           ) %>%
@@ -124,14 +122,27 @@ chol <- chol_raw %>%
      mutate(outcome = ifelse(death_norm > 0.7, "Death", "Alive")) %>% 
      
      # re-arrange columns
-     select(case_id, name, town, sex, age_years, age_group, date_onset, date_admit,
-            prior_vax, dehy_at_admit, oedema, pregnant, loose_stool, bloody_stool,
-            death_chance, death_norm, outcome)
+     select(case_id,
+            #name,
+            town, sex, age_years, age_grp, date_onset,
+            #date_admit,  # dates of admit appear to be before dates of onset?
+            prior_vax, dehy_at_admit, oedema, pregnant, stool_bloody,
+            outcome)
      
 
 
 
 # Outputs -----------------------------------------------------------------
+
+# head - first 5 cases
+chol %>% 
+     arrange(date_onset) %>% 
+     head() %>% 
+     qflextable() %>% 
+     fontsize(size = 8, part = "all") %>%
+     line_spacing(space = 0.5) %>% 
+     theme_box() %>% 
+     set_caption(caption = "caption")
 
 # Epicurve to show waves of epidemic
 ggplot(data = chol, mapping = aes(x = date_onset, fill = town))+
