@@ -31,6 +31,7 @@ chol <- chol_raw %>%
           date_admit = date_of_consultation_admission,
           date_onset = date_of_onset,
           town = patient_origin,
+          preg = pregnant
      ) %>% 
      
      # add patient names
@@ -63,15 +64,20 @@ chol <- chol_raw %>%
           TRUE ~ "A")) %>% 
      
      # re-code case_id
-     mutate(case_id = )
+     #mutate(case_id = )
           
      # recode pregnant away from MSF acronyms      
      mutate(
-          pregnant = na_if(pregnant, "NA"),
-          pregnant = recode(pregnant,
+          preg = na_if(preg, "NA"),
+          preg = recode(preg,
                  "Y" = "Yes",
                  "N" = "No",
                  "W" = "No")) %>% 
+     
+     # recode sex away from MSF acronyms      
+     mutate(sex = as.character(sex), 
+            sex = na_if(sex, " U"),
+            sex = na_if(sex, "NA")) %>% 
      
      # assign new symptoms/risk factor columns based on probabilities
      mutate(
@@ -105,7 +111,7 @@ chol <- chol_raw %>%
           death_chance = ifelse(!is.na(date_onset) & date_onset < ymd("20180301"), death_chance + 0.40, death_chance),  # first wave
           #death_chance = ifelse(!is.na(loose_stool) & loose_stool == "Yes", death_chance + 0.20, death_chance), # diarrhea
           death_chance = ifelse(!is.na(town) & town == "C", death_chance + 0.20, death_chance), # remote, poor infrastructure, epicentre
-          death_chance = ifelse(!is.na(pregnant) & pregnant == "Yes", death_chance + 0.15, death_chance), # complications
+          death_chance = ifelse(!is.na(preg) & preg == "Yes", death_chance + 0.15, death_chance), # complications
           death_chance = ifelse(!is.na(oedema) & oedema == "Yes", death_chance + 0.20, death_chance),
 
           # protective factors
@@ -123,10 +129,12 @@ chol <- chol_raw %>%
      
      # re-arrange columns
      select(case_id,
-            #name,
-            town, sex, age_years, age_grp, date_onset,
-            #date_admit,  # dates of admit appear to be before dates of onset?
-            prior_vax, dehy_at_admit, oedema, pregnant, stool_bloody,
+            name,
+            town, sex, age_years, 
+            age_grp,  # for use later
+            date_onset,
+            date_admit,  # dates of admit appear to be before dates of onset?
+            prior_vax, dehy_at_admit, oedema, preg, stool_bloody,
             outcome)
      
 
@@ -136,13 +144,41 @@ chol <- chol_raw %>%
 
 # head - first 5 cases
 chol %>% 
+     select(case_id,
+            #name,
+            town, sex, age_years, 
+            #age_grp,  # for use later
+            date_onset,
+            #date_admit,  # dates of admit appear to be before dates of onset?
+            prior_vax, dehy_at_admit, oedema, preg, stool_bloody,
+            outcome) %>% 
      arrange(date_onset) %>% 
      head() %>% 
      qflextable() %>% 
      fontsize(size = 8, part = "all") %>%
-     line_spacing(space = 0.5) %>% 
+     line_spacing(space = 1) %>% 
      theme_box() %>% 
-     set_caption(caption = "caption")
+     padding(padding = 1, part = "all") %>% 
+     fit_to_width(max_width = 6)
+     #autofit()
+
+# Demographic pyramid
+age_pyramid(chol,
+            age_group = age_grp,
+            split_by = sex,
+            proportional = TRUE,
+            show_midpoint = FALSE)+
+     labs(title = "Age and sex of cholera cases",
+          subtitle = str_glue("Total of {nrow(chol)} cases as of {format(max(chol$date_admit, na.rm=T), '%d %b, %Y')}"),
+          fill = "Sex",
+          y = "Proportion of total",
+          x = "Age group")+
+     theme_minimal(base_size = 8)+
+     theme(
+          legend.position = "top"
+     )
+
+ggsave("demographic_pyramid.png", width = 3, height = 3)
 
 # Epicurve to show waves of epidemic
 ggplot(data = chol, mapping = aes(x = date_onset, fill = town))+
