@@ -13,6 +13,11 @@ pacman::p_load(
      randomNames,
      flextable,
      tsibble,
+     sf,
+     ggspatial,
+     png,
+     ggpubr,
+     sitrep,
      tidyverse
 )
 
@@ -292,6 +297,10 @@ chol %>%
      fit_to_width(max_width = 6)
      #autofit()
 
+
+
+
+
 # Demographic pyramid
 age_pyramid(chol,
             age_group = age_grp,
@@ -313,12 +322,15 @@ ggsave("demographic_pyramid.png", width = 3, height = 3)
 
 
 
+
+
+
 # Epicurve to show waves of epidemic
 epiweeks <- seq.Date(floor_date(min(chol$date_onset, na.rm=T), "week"),
                      ceiling_date(max(chol$date_onset, na.rm=T), "week"),
                      "week")
 
-ggplot(data = chol, mapping = aes(x = date_onset, fill = town))+
+ggplot(data = chol, mapping = aes(x = date_onset))+
      geom_histogram(breaks = epiweeks, closed = "left",
                     color = "black")+
      scale_fill_brewer(type = "qual")+
@@ -331,8 +343,8 @@ ggplot(data = chol, mapping = aes(x = date_onset, fill = town))+
      facet_wrap(~town, ncol = 1)+
      theme_minimal()+
      labs(
-          title = "Epidemic curve by town",
-          subtitle = "300 cases as of 30 April, 2018",
+          title = "Weekly confirmed and suspect cholera cases, by town",
+          subtitle = "300 confirmed cases as of 30 April, 2018",
           x = "Week of symptom onset",
           y = "Weekly cases",
           fill = "Town"
@@ -341,6 +353,10 @@ ggplot(data = chol, mapping = aes(x = date_onset, fill = town))+
 
 ggsave("epicurve by town.png", width = 3, height = 6)
      
+
+
+
+
 
 # Epicurve showing outcomes improving as response infrastructure improves
 ggplot(data = chol, mapping = aes(x = date_onset, fill = outcome))+
@@ -379,3 +395,90 @@ cross_tab <- output$inputs$data %>%
 ## combine for a full table 
 gtsummary::tbl_merge(list(cross_tab, output))
 
+
+
+
+# Make map
+## fake map data - DELETE if you are using real data
+map <- gen_polygon(regions = unique(chol$town))
+
+
+#generate clusters of lat/lon such that town C is more clustered and A and B more dispersed
+#https://datacadamia.com/lang/r/cluster#create_data_points
+
+# get bounding box of map
+bounding_box <- map %>% 
+ st_bbox()
+
+set.seed(99)
+#x=matrix(rnorm(100*2), 100, 2)
+# generate random points in bounding box
+x = data.frame(x = runif(100, bounding_box[["xmin"]], bounding_box[["xmax"]]),
+                   y = runif(100, bounding_box[["ymin"]], bounding_box[["ymax"]]))
+plot(x,pch=19)
+# assign each point to one of three clusters
+which=sample(1:3,100,prob = c(0.4, 0.5, 0.1), replace=TRUE)
+which
+# designate points for each cluster (town A, B, or C)
+xmean = matrix(c(16.35, 16.49, 16.29,
+                 48.27, 48.15, 48.16),
+               3,   # 3 rows
+               2    # 2 columns
+               )
+#xmean=matrix(rnorm(3*2,sd=0.2),3,2)
+
+plot(x, col=which, pch=19)
+
+# cluster points by adding
+xclustered = x + (4* xmean[which,])
+
+# re-scale to the desired bbox extent
+xclustered <- xclustered %>% 
+     mutate(x = scales::rescale(x, to = c(bounding_box[["xmin"]], bounding_box[["xmax"]])),
+            y = scales::rescale(y, to = c(bounding_box[["ymin"]], bounding_box[["ymax"]]))
+                                )
+plot(xclustered,col=which,pch=19)
+
+
+# 
+# bbx2 <- st_bbox(c(ymin = 34.457375, ymax = 35.014948 , xmax = -94.697891, xmin = -95.899392), crs = st_crs(4326))
+# bbx3 <- st_bbox(c(ymin = 34.991457, ymax = 33.788217 , xmax = -92.165637, xmin = -95.094851), crs = st_crs(4326))
+# # 
+# 
+# # plot a base map including scale bar 
+# basemap <- ggplot() +
+#      # change the bounding box to an sf object
+#      # this defines the area to download map tiles for
+#      geom_sf(data = st_as_sfc(bbx3)) +
+#      # download map tiles and add to the plot
+#      annotation_map_tile(
+#           # define what map tiles to use
+#           type =  "thunderforestoutdoors",
+#           # define folder to store tile images 
+#           cachedir = here::here("data", "map_tiles"),
+#           # define if should download tiles each time
+#           forcedownload = FALSE,
+#           # hide messages about download status and zoom
+#           progress = "none" )+
+#      theme_void()
+
+
+# import background image
+img <- readPNG(here("data", "map_background2.png"))
+
+# make map
+ggplot()+
+  # load shapefile
+  background_image(img)+
+  geom_sf(data = map, fill = NA, alpha = 0.3) +
+  geom_sf_label(data = map, aes(label = name))+
+  # add in case coordinates
+  geom_point(mapping = aes(x = x, y = y),
+             data = xclustered,
+             color = "red")+
+  labs(x = "",
+       y = "",
+       title = "Suspect cholera cases, 30 April 2018",
+       caption = "Locations have been jittered for anonymity")
+
+ggsave("map_points.png")
