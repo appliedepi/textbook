@@ -445,6 +445,7 @@ plot(xclustered,col=which,pch=19)
 
 
 # import background image
+# https://www.google.com/maps/@39.27985,-92.7806888,284157m/data=!3m1!1e3!5m1!1e4
 img <- readPNG(here("data", "map_background2.png"))
 
 # make map
