@@ -1,3 +1,16 @@
+---
+title: "Untitled"
+output: word_document
+date: "2022-11-23"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
 # code and analysis for Dale Fisher textbook chapter on field epidemiology
 # cholera scenario
 
@@ -378,4 +391,7 @@ cross_tab <- output$inputs$data %>%
 
 ## combine for a full table 
 gtsummary::tbl_merge(list(cross_tab, output))
+
+
+```
 
