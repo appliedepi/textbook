@@ -16,23 +16,6 @@ pacman::p_load(
      tidyverse
 )
 
-pacman::p_load(rio,          # File import
-               here,         # File locator
-               tidyverse,    # data management + ggplot2 graphics
-               tsibble,      # handle time series datasets
-               slider,       # for calculating moving averages
-               imputeTS,     # for filling in missing values
-               feasts,       # for time series decomposition and autocorrelation
-               forecast,     # fit sin and cosin terms to data (note: must load after feasts)
-               trending,     # fit and assess models 
-               tmaptools,    # for getting geocoordinates (lon/lat) based on place names
-               ecmwfr,       # for interacting with copernicus sateliate CDS API
-               stars,        # for reading in .nc (climate data) files
-               units,        # for defining units of measurement (climate data)
-               yardstick,    # for looking at model accuracy
-               surveillance  # for aberration detection
-)
-
 
 # Generate cholera data ---------------------------------------------------
 chol_raw <- sitrep::gen_data("cholera")
@@ -321,14 +304,13 @@ epiweeks <- seq.Date(floor_date(min(chol$date_onset, na.rm=T), "week"),
 ggplot(data = chol, mapping = aes(x = date_onset, fill = town))+
      geom_histogram(breaks = epiweeks, closed = "left",
                     color = "black")+
-     scale_fill_brewer(type = "qual")+
+     scale_fill_brewer(type = "qual", palette = )+
      scale_x_date(
           date_breaks = "2 weeks",
           labels = scales::label_date_short())+
      scale_y_continuous(
-          breaks = seq(0, 40, 5)
-     )+
-     facet_wrap(~town, ncol = 1)+
+          breaks = seq(0, 40, 5))+
+     facet_wrap(~str_glue("Town {town}"), ncol = 1)+
      theme_minimal()+
      labs(
           title = "Epidemic curve by town",
@@ -345,8 +327,7 @@ ggsave("epicurve by town.png", width = 3, height = 6)
 # Epicurve showing outcomes improving as response infrastructure improves
 ggplot(data = chol, mapping = aes(x = date_onset, fill = outcome))+
      geom_histogram()+
-     labs()+
-     facet_wrap(~town)
+     labs()
 
 
 
